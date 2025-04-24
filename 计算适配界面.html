@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+
+  <!-- 让页面与手机屏幕宽度匹配，并设置合适的初始缩放 -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+
+  <title>细胞悬液稀释计算器（适配手机）</title>
+  <style>
+    /* 全局样式 */
+    body {
+      font-family: Arial, sans-serif;
+      font-size: 16px;  /* 适合手机阅读的基础字体大小 */
+      margin: 0 auto;
+      padding: 10px;
+      max-width: 600px; /* 在桌面时页面宽度不超过600px，居中显示 */
+      box-sizing: border-box;
+    }
+
+    h1, h2 {
+      color: #333;
+      margin-top: 0;
+    }
+
+    /* 标签与输入框的基础布局 */
+    label {
+      display: inline-block;
+      width: 220px; /* 在较宽屏幕时并排显示 */
+      margin-bottom: 6px;
+      vertical-align: middle;
+    }
+
+    input {
+      width: 160px;
+      margin-bottom: 10px;
+      padding: 6px;
+      font-size: 16px;  /* 输入框文字大小 */
+    }
+
+    button {
+      margin-top: 10px;
+      padding: 10px 16px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+
+    .result {
+      margin-top: 15px;
+      padding: 10px;
+      border: 1px solid #ccc;
+    }
+
+    .hint {
+      font-size: 0.9em;
+      color: #666;
+      margin-top: 10px;
+    }
+
+    /* 在屏幕宽度小于600px时，自适应布局(手机常见屏幕) */
+    @media (max-width: 600px) {
+      label {
+        width: 100%;
+        display: block;  /* 标签换行显示 */
+      }
+      input {
+        width: 100%;    /* 输入框全宽 */
+      }
+      button {
+        width: 100%;    /* 按钮全宽 */
+      }
+    }
+  </style>
+</head>
+<body>
+
+<h1>细胞悬液稀释计算器</h1>
+<p class="hint">
+  - 不保留余量：使用“所需细胞数”和“悬液总量”计算<br>
+  - 保留余量：在最终体积上加上 reserveVolume (µL) 并保持同样的浓度，因此需要更多细胞
+</p>
+
+<!-- 输入区 -->
+<div>
+  <label for="concentration">细胞悬液浓度 (cells/mL)：</label>
+  <input type="number" id="concentration" placeholder="例如：1.0e6" />
+</div>
+
+<div>
+  <label for="cellNumber">所需细胞总数 (cells)：</label>
+  <input type="number" id="cellNumber" placeholder="例如：1.0e7" />
+</div>
+
+<div>
+  <label for="finalVolume">所需悬液总量 (µL)：</label>
+  <input type="number" id="finalVolume" placeholder="例如：1000" step="0.01" />
+</div>
+
+<div>
+  <label for="reserveVolume">希望保留余量 (µL)：</label>
+  <input type="number" id="reserveVolume" placeholder="例如：100" step="0.01" />
+</div>
+
+<button onclick="calculate()">计算</button>
+
+<!-- 输出区：只显示最后一次计算结果 -->
+<div class="result" id="resultArea" style="display: none;">
+  <h2>计算结果</h2>
+  <!-- 不保留余量结果 -->
+  <div id="resultWithoutReserve"></div>
+  <!-- 保留余量结果 -->
+  <div id="resultWithReserve" style="margin-top: 10px;"></div>
+</div>
+
+<script>
+function calculate() {
+  // 获取输入
+  const concentration = parseFloat(document.getElementById('concentration').value); // cells/mL
+  const cellNumber = parseFloat(document.getElementById('cellNumber').value);
+  const finalVolume = parseFloat(document.getElementById('finalVolume').value); // µL
+  const reserveVolume = parseFloat(document.getElementById('reserveVolume').value);
+
+  // 检查有效性
+  if (
+    isNaN(concentration) || isNaN(cellNumber) || isNaN(finalVolume) ||
+    concentration <= 0 || cellNumber <= 0 || finalVolume <= 0
+  ) {
+    alert("请正确填写所有数值（浓度/细胞数/体积需为正数）！");
+    return;
+  }
+
+  // 如保留余量无效，则默认0
+  let extraVolume = 0;
+  if (!isNaN(reserveVolume) && reserveVolume > 0) {
+    extraVolume = reserveVolume;
+  }
+
+  // --- 不保留余量计算 ---
+  // (1) 所需原细胞悬液(µL)
+  const requiredCellVolumeMl = cellNumber / concentration; 
+  const requiredCellVolumeUl = requiredCellVolumeMl * 1000;
+
+  // (2) 培养基体积
+  const requiredMediumVolumeUl = finalVolume - requiredCellVolumeUl;
+
+  // (3) 最终浓度 (cells/mL)
+  //     先算 (cells/µL) = cellNumber / finalVolume, 再 *1000 => cells/mL
+  const finalConcNoReserve_cellsPerUl = cellNumber / finalVolume;
+  const finalConcNoReserve_cellsPerMl = finalConcNoReserve_cellsPerUl * 1000;
+
+  let textWithoutReserve = "";
+  if (requiredMediumVolumeUl < 0) {
+    textWithoutReserve = `
+      【不保留余量】
+      <br>所需细胞悬液：<strong>${requiredCellVolumeUl.toFixed(2)}</strong> µL（超出目标体积）
+      <br>请检查输入。
+    `;
+  } else {
+    textWithoutReserve = `
+      【不保留余量】
+      <br>所需细胞悬液：<strong>${requiredCellVolumeUl.toFixed(2)}</strong> µL
+      <br>补加培养基：<strong>${requiredMediumVolumeUl.toFixed(2)}</strong> µL
+      <br>最终体积：<strong>${finalVolume.toFixed(2)}</strong> µL
+      <br>最终浓度：<strong>${finalConcNoReserve_cellsPerMl.toFixed(2)}</strong> cells/mL
+    `;
+  }
+
+  // --- 保留余量计算 ---
+  // 目标体积 = finalVolume + extraVolume
+  // 保持相同浓度 => newCellNumber = (cells/µL) * 新体积
+  const newFinalVolume = finalVolume + extraVolume;
+  const newCellNumber = finalConcNoReserve_cellsPerUl * newFinalVolume;
+
+  // 所需原细胞悬液
+  const requiredCellVolumeWithReserveMl = newCellNumber / concentration;
+  const requiredCellVolumeWithReserveUl = requiredCellVolumeWithReserveMl * 1000;
+  const requiredMediumVolumeWithReserveUl = newFinalVolume - requiredCellVolumeWithReserveUl;
+
+  // 最终浓度 (cells/mL)
+  const newConc_cellsPerUl = newCellNumber / newFinalVolume;
+  const newConc_cellsPerMl = newConc_cellsPerUl * 1000;
+
+  let textWithReserve = "";
+  if (requiredMediumVolumeWithReserveUl < 0) {
+    textWithReserve = `
+      【保留余量(多 ${extraVolume} µL)】
+      <br>总体积：<strong>${newFinalVolume.toFixed(2)}</strong> µL
+      <br>所需细胞悬液：<strong>${requiredCellVolumeWithReserveUl.toFixed(2)}</strong> µL（已超出目标体积）
+      <br>请检查输入。
+    `;
+  } else {
+    textWithReserve = `
+      【保留余量(多 ${extraVolume} µL)】
+      <br>最终体积：<strong>${newFinalVolume.toFixed(2)}</strong> µL
+      <br>所需细胞总数：<strong>${newCellNumber.toFixed(2)}</strong> cells
+      <br>所需细胞悬液：<strong>${requiredCellVolumeWithReserveUl.toFixed(2)}</strong> µL
+      <br>补加培养基：<strong>${requiredMediumVolumeWithReserveUl.toFixed(2)}</strong> µL
+      <br>最终浓度：<strong>${newConc_cellsPerMl.toFixed(2)}</strong> cells/mL
+    `;
+  }
+
+  // 显示计算结果（覆盖旧结果）
+  document.getElementById('resultWithoutReserve').innerHTML = textWithoutReserve;
+  document.getElementById('resultWithReserve').innerHTML = textWithReserve;
+  document.getElementById('resultArea').style.display = 'block';
+}
+</script>
+
+</body>
+</html>
